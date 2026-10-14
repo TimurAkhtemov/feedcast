@@ -154,6 +154,20 @@ synthesis.
 joined with pauses, two-pass ffmpeg loudnorm, MP3 with ID3 chapters, written to
 iCloud atomically, so the phone never syncs a half-written file.
 
+## Known limits
+
+- The grounding check is lexical. It catches a figure, name, or place that no source
+  mentions; it can't catch a wrong claim built from words the sources do contain.
+- Deliberate blind spots, to keep false alarms down: a lone "one" (usually a pronoun)
+  and "first/second/third" aren't checked as numbers; a sentence-initial word that is
+  also an ordinary dictionary word ("Apple announced...") isn't treated as a name
+  (mid-sentence it is, and all-caps acronyms always are); "-5" is read as 5, because
+  hyphens are far more often "COVID-19" or "10-12".
+- Laya judges compound topics loosely (see above), and it's English-only. Feeds in
+  other languages will be judged badly.
+- Sites that don't advertise a feed show up in the show notes as "matching coverage,
+  no feed found" rather than as a feed URL.
+
 ## Tuning
 
 `config.yaml` holds every threshold and length. To see how Laya is answering:
