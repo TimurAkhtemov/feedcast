@@ -6,4 +6,5 @@ data/
 *.db
 *.mp3
 *.wav
+searxng/.env
 !feedcast/assets/failed.mp3

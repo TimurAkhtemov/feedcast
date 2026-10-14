@@ -1,5 +1,6 @@
 # feedcast's local SearXNG: JSON API on, no limiter, English news first.
-# Only reachable on 127.0.0.1 (see docker-compose.yml), so the committed key is fine.
+# Only reachable on 127.0.0.1 (see docker-compose.yml). The secret key isn't here:
+# it comes from SEARXNG_SECRET in searxng/.env (git-ignored, one per install).
 use_default_settings: true
 
 general:
@@ -11,7 +12,6 @@ search:
   formats: [html, json]
 
 server:
-  secret_key: "ee59919d4648d3ed6d72db9a76263afa29e0aace8c59214a8d16b03c9f295b8e"
   limiter: false
   image_proxy: false
   public_instance: false

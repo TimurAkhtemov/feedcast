@@ -9,6 +9,10 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8888:8080"
+    environment:
+      # From searxng/.env (git-ignored). feedcast creates it on first start; by hand:
+      #   echo "SEARXNG_SECRET=$(openssl rand -hex 32)" > searxng/.env
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?create searxng/.env first, see searxng/README.md}
     volumes:
       # Mount the file, not the folder: the entrypoint chowns /etc/searxng and
       # would fail on a read-only directory mount.

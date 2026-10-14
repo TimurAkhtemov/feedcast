@@ -253,12 +253,13 @@ def test_ensure_up_false_when_docker_missing(monkeypatch):
     assert ensure_up(wait_seconds=0.1) is False
 
 
-def test_ensure_up_false_when_docker_path_does_not_exist(monkeypatch):
+def test_ensure_up_false_when_docker_path_does_not_exist(monkeypatch, tmp_path):
     monkeypatch.setattr(search_mod, "is_up", lambda base_url=None, **kw: False)
-    assert ensure_up(docker="/nonexistent/bin/docker", wait_seconds=0.1) is False
+    compose = tmp_path / "docker-compose.yml"
+    assert ensure_up(docker="/nonexistent/bin/docker", compose_file=compose, wait_seconds=0.1) is False
 
 
-def test_ensure_up_false_when_compose_fails(monkeypatch):
+def test_ensure_up_false_when_compose_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(search_mod, "is_up", lambda base_url=None, **kw: False)
     calls: list[list[str]] = []
 
@@ -267,11 +268,12 @@ def test_ensure_up_false_when_compose_fails(monkeypatch):
         return search_mod.subprocess.CompletedProcess(cmd, 1, "", "Cannot connect to the Docker daemon")
 
     monkeypatch.setattr(search_mod.subprocess, "run", fake_run)
-    assert ensure_up(docker="/usr/bin/docker", wait_seconds=0.1) is False
-    assert calls == [["/usr/bin/docker", "compose", "-f", str(COMPOSE_FILE), "up", "-d"]]
+    compose = tmp_path / "docker-compose.yml"
+    assert ensure_up(docker="/usr/bin/docker", compose_file=compose, wait_seconds=0.1) is False
+    assert calls == [["/usr/bin/docker", "compose", "-f", str(compose), "up", "-d"]]
 
 
-def test_ensure_up_polls_until_healthy(monkeypatch):
+def test_ensure_up_polls_until_healthy(monkeypatch, tmp_path):
     answers = iter([False, False, True])
     monkeypatch.setattr(search_mod, "is_up", lambda base_url=None, **kw: next(answers))
     monkeypatch.setattr(search_mod, "_POLL_INTERVAL", 0.0)
@@ -280,10 +282,11 @@ def test_ensure_up_polls_until_healthy(monkeypatch):
         "run",
         lambda cmd, **kw: search_mod.subprocess.CompletedProcess(cmd, 0, "", ""),
     )
-    assert ensure_up(docker="/usr/bin/docker", wait_seconds=5) is True
+    assert ensure_up(docker="/usr/bin/docker", compose_file=tmp_path / "c.yml", wait_seconds=5) is True
+    assert (tmp_path / ".env").read_text().startswith("SEARXNG_SECRET=")
 
 
-def test_ensure_up_gives_up_after_wait(monkeypatch):
+def test_ensure_up_gives_up_after_wait(monkeypatch, tmp_path):
     monkeypatch.setattr(search_mod, "is_up", lambda base_url=None, **kw: False)
     monkeypatch.setattr(search_mod, "_POLL_INTERVAL", 0.0)
     monkeypatch.setattr(
@@ -291,7 +294,22 @@ def test_ensure_up_gives_up_after_wait(monkeypatch):
         "run",
         lambda cmd, **kw: search_mod.subprocess.CompletedProcess(cmd, 0, "", ""),
     )
-    assert ensure_up(docker="/usr/bin/docker", wait_seconds=0.05) is False
+    assert ensure_up(docker="/usr/bin/docker", compose_file=tmp_path / "c.yml", wait_seconds=0.05) is False
+
+
+def test_ensure_secret_creates_a_private_key_once(tmp_path):
+    env = tmp_path / ".env"
+    assert search_mod.ensure_secret(env) is True
+    first = env.read_text()
+    assert len(first.strip().split("=", 1)[1]) == 64
+    assert env.stat().st_mode & 0o777 == 0o600
+    assert search_mod.ensure_secret(env) is False and env.read_text() == first
+
+
+def test_committed_settings_hold_no_secret():
+    settings = (COMPOSE_FILE.parent / "settings.yml").read_text()
+    assert "secret_key" not in settings.replace("# secret_key", "")
+    assert "SEARXNG_SECRET" in COMPOSE_FILE.read_text()
 
 
 def _fail_if_called(*args, **kwargs):

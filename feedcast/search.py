@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import shutil
 import subprocess
 import time
@@ -270,12 +271,28 @@ def _find_docker() -> str | None:
     return None
 
 
+def ensure_secret(env_file: Path) -> bool:
+    """Create searxng/.env with a random SEARXNG_SECRET if it's missing.
+
+    SearXNG's secret_key comes from that variable rather than the committed
+    settings.yml, so every install gets its own key. True if the file was created.
+    """
+    try:
+        fd = os.open(env_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w") as fh:
+        fh.write(f"SEARXNG_SECRET={secrets.token_hex(32)}\n")
+    return True
+
+
 def _compose_up(exe: str, compose_file: Path) -> bool:
     # docker shells out to credential helpers that live beside it, which a bare
     # launchd PATH would not find.
     path = os.pathsep.join([str(Path(exe).parent), os.environ.get("PATH", "")])
     env = {**os.environ, "PATH": path}
     try:
+        ensure_secret(compose_file.parent / ".env")
         proc = subprocess.run(
             [exe, "compose", "-f", str(compose_file), "up", "-d"],
             capture_output=True,

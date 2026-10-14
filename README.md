@@ -38,6 +38,7 @@ Requirements, all already on this Mac: Python 3.12 + `uv`, `ffmpeg`, Ollama with
 
 ```bash
 uv sync                                               # Laya, Kokoro (mlx-audio), etc.
+echo "SEARXNG_SECRET=$(openssl rand -hex 32)" > searxng/.env   # once: SearXNG's own key
 docker compose -f searxng/docker-compose.yml up -d    # local SearXNG on 127.0.0.1:8888
 uv run feedcast ingest                                 # first fill of the pool (~30 s)
 uv run feedcast edition --no-ingest                    # a first episode
