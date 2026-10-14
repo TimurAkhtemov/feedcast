@@ -1,0 +1,7 @@
+# The feed pool. Keep it broad: topics are picked from it per episode,
+# so feeds don't need to be organized by topic.
+#
+# feeds:
+#   - name: Example Outlet
+#     url: https://example.com/rss
+feeds: []

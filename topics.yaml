@@ -1,0 +1,7 @@
+# Standing topics for the default edition. Phrase each one positively
+# (Laya handles "not about X" badly).
+#
+# topics:
+#   - semiconductor export controls
+#   - AI tooling for developers
+topics: []
