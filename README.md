@@ -19,9 +19,10 @@ feeds.yaml ─► ingest (hourly) ─► SQLite pool
 
 Two modes:
 
-- **Default edition** (`feedcast edition`, launchd at 05:30): the biggest stories
-  across the whole pool from the last 24 hours, plus a story or two for each standing
-  topic in `topics.yaml`. About 12 minutes (`config.yaml` → `edition.target_minutes`).
+- **Default edition** (`feedcast edition`, launchd at 05:30 on Monday, Wednesday and
+  Friday): the biggest stories across the whole pool since the previous edition (Monday's
+  covers the weekend), plus a story or two for each standing topic in `topics.yaml`.
+  About 12 minutes. Days, time, and length are in `config.yaml` → `edition`.
 - **On-demand** (`feedcast ask "topic" ...`, or a `.txt` dropped in
   `iCloud Drive/Feedcast/requests/` from your phone): an episode on just those topics,
   built from the already-ingested pool in a minute or two. If fewer than 5 items match a
@@ -39,7 +40,7 @@ uv sync                                               # Laya, Kokoro (mlx-audio)
 docker compose -f searxng/docker-compose.yml up -d    # local SearXNG on 127.0.0.1:8888
 uv run feedcast ingest                                 # first fill of the pool (~30 s)
 uv run feedcast edition --no-ingest                    # a first episode
-uv run feedcast launchd install                        # hourly ingest, 05:30 edition, request watcher
+uv run feedcast launchd install                        # hourly ingest, M/W/F edition, request watcher
 ```
 
 Model weights download on first use into `~/.cache/huggingface`: Laya is pinned to
@@ -48,15 +49,19 @@ Model weights download on first use into `~/.cache/huggingface`: Laya is pinned 
 
 ### One-time: wake the Mac before the morning edition (you run this)
 
-The 05:30 edition only runs if the Mac is awake. Schedule a wake at 05:25 every day.
-This needs `sudo`, and the Mac must be **plugged in** (scheduled wakes don't fire on
-battery):
+The edition runs at 05:30 on Monday, Wednesday and Friday, but only if the Mac is awake
+(if it's asleep, launchd runs it as soon as the Mac next wakes). Schedule a wake at
+05:25 on those days. This needs `sudo`, and the Mac must be **plugged in** (scheduled
+wakes don't fire on battery):
 
 ```bash
-sudo pmset repeat wakeorpoweron MTWRFSU 05:25:00
+sudo pmset repeat wakeorpoweron MWF 05:25:00
 pmset -g sched                       # check it took
 # sudo pmset repeat cancel           # to undo
 ```
+
+If you change `edition.days` in `config.yaml`, run `uv run feedcast launchd install` and
+the `pmset` command again with the matching days (M T W R F S U).
 
 ### One-time: let the launchd jobs use iCloud Drive
 

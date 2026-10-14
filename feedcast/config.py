@@ -7,6 +7,7 @@ without touching the pipeline.
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,13 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "timeout_seconds": 20,
     },
     "group": {"embed_model": "embeddinggemma", "similarity": 0.75},
-    "edition": {"target_minutes": 12, "window_hours": 24, "topic_stories": 2},
+    "edition": {
+        "target_minutes": 12,
+        "days": ["mon", "wed", "fri"],
+        "time": "05:30",
+        "min_window_hours": 24,
+        "topic_stories": 2,
+    },
     "ask": {
         "target_minutes": 6,
         "window_hours": 96,
@@ -53,6 +60,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     },
 }
 
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # datetime.weekday() order
+
 NEGATIONS = ("not ", "no ", "non-", "without ", "except ", "excluding ", "other than ", "n't ")
 
 
@@ -69,6 +78,39 @@ def load_config(path: Path | None = None) -> dict[str, dict[str, Any]]:
                 raise ValueError(f"{path.name}: unknown keys in {section}: {sorted(unknown)}")
             config[section].update(values or {})
     return config
+
+
+def edition_schedule(edition: dict[str, Any]) -> tuple[list[int], int, int]:
+    """The edition's (weekdays, hour, minute), weekdays as datetime.weekday() numbers."""
+    days = [str(d).strip().lower()[:3] for d in edition["days"]]
+    bad = [d for d in days if d not in DAYS]
+    if bad:
+        raise ValueError(f"edition.days: unknown day(s) {bad}; use {', '.join(DAYS)}")
+    try:
+        hour, minute = (int(part) for part in str(edition["time"]).split(":"))
+    except ValueError:
+        raise ValueError(f"edition.time: expected HH:MM, got {edition['time']!r}") from None
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        raise ValueError(f"edition.time: expected HH:MM, got {edition['time']!r}")
+    return sorted({DAYS.index(d) for d in days}), hour, minute
+
+
+def edition_since(now: datetime, edition: dict[str, Any]) -> datetime:
+    """Start of an edition's news window: the last scheduled edition at least
+    min_window_hours before now.
+
+    With Monday, Wednesday and Friday editions, Monday's covers the weekend from Friday
+    morning and the other two cover two days each. A manual run covers everything since
+    the last scheduled edition that's at least min_window_hours old.
+    """
+    latest = now - timedelta(hours=edition["min_window_hours"])
+    weekdays, hour, minute = edition_schedule(edition)
+    slot = latest.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    for _ in range(8):
+        if slot <= latest and slot.weekday() in weekdays:
+            return slot
+        slot -= timedelta(days=1)
+    return latest  # no days scheduled
 
 
 def load_topics(path: Path | None = None) -> list[str]:

@@ -28,7 +28,7 @@ import numpy as np
 
 from feedcast import paths
 from feedcast import text as textutil
-from feedcast.config import negation_warning
+from feedcast.config import edition_since, negation_warning
 from feedcast.db import Item, Store
 from feedcast.feedcheck import FeedCheck, FeedSpec, normalize_feed_url
 from feedcast.group import Cluster, cluster_items, embed_items, query_text, shortlist
@@ -327,11 +327,12 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
                 log.warning("fresh ingest failed: %s", exc)
                 report.notes.append(f"The fresh ingest failed ({exc}); this edition uses items already in the pool.")
         step("loading the pool")
-        since = now.timestamp() - cfg["edition"]["window_hours"] * 3600
-        items = svc.store.items_since(since)
+        since = edition_since(now, cfg["edition"])
+        items = svc.store.items_since(since.timestamp())
+        report.stats["window"] = f"since {since:%a %b} {since.day}, {since:%H:%M}"
         report.stats["items_in_window"] = len(items)
         if not items:
-            raise RuntimeError(f"the pool has no items from the last {cfg['edition']['window_hours']} hours")
+            raise RuntimeError(f"the pool has no items since {since:%A %H:%M}")
         step("judging ads with Laya")
         judge = Judge(svc.store, svc.backend, run_id=f"edition-{now:%Y%m%d-%H%M}")
         items = drop_ads(svc, judge, items, report)

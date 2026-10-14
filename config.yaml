@@ -27,7 +27,13 @@ group:
 
 edition:
   target_minutes: 12
-  window_hours: 24
+  # When launchd builds the edition (`feedcast launchd install` again after changing
+  # these). Keep the days in step with the pmset wake in the README.
+  days: [mon, wed, fri]
+  time: "05:30"
+  # Each edition covers the news since the previous scheduled one, so Monday's covers
+  # the weekend, but never less than this.
+  min_window_hours: 24
   # Clusters picked per standing topic in topics.yaml.
   topic_stories: 2
 

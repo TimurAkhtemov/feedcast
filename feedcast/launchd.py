@@ -1,4 +1,4 @@
-"""launchd agents: hourly ingest, the 05:30 edition, and a watcher on the requests folder.
+"""launchd agents: hourly ingest, the scheduled edition, and a watcher on the requests folder.
 
 They're user LaunchAgents (no sudo). launchd starts jobs with a bare PATH, so each
 agent gets an explicit one that includes Homebrew (ffmpeg) and Docker (SearXNG).
@@ -11,7 +11,7 @@ import plistlib
 import subprocess
 from pathlib import Path
 
-from feedcast import paths
+from feedcast import config, paths
 
 AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 LOG_DIR = paths.DATA_DIR / "logs"
@@ -22,7 +22,10 @@ def executable() -> str:
     return str(paths.PROJECT_ROOT / ".venv" / "bin" / "feedcast")
 
 
-def agents(edition_hour: int = 5, edition_minute: int = 30) -> dict[str, dict]:
+def agents(settings: dict | None = None) -> dict[str, dict]:
+    """The three agents. The edition's days and time come from config.yaml's edition section."""
+    weekdays, hour, minute = config.edition_schedule(settings or config.load_config()["edition"])
+
     def base(label: str, *args: str) -> dict:
         name = label.rsplit(".", 1)[-1]
         return {
@@ -39,7 +42,9 @@ def agents(edition_hour: int = 5, edition_minute: int = 30) -> dict[str, dict]:
     ingest = base("com.feedcast.ingest", "ingest", "--warm")
     ingest["StartInterval"] = 3600
     edition = base("com.feedcast.edition", "edition")
-    edition["StartCalendarInterval"] = {"Hour": edition_hour, "Minute": edition_minute}
+    # launchd counts weekdays from Sunday = 0; datetime.weekday() from Monday = 0.
+    edition["StartCalendarInterval"] = [{"Weekday": (day + 1) % 7, "Hour": hour, "Minute": minute}
+                                        for day in weekdays]
     edition["ProcessType"] = "Interactive"  # don't let App Nap slow the morning build
     watch = base("com.feedcast.watch", "watch")
     watch["WatchPaths"] = [str(paths.REQUESTS_DIR)]
