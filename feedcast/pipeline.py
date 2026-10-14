@@ -357,7 +357,7 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
                 topic_plan.append((c, topic))
                 taken.add(id(c))
             if not ranked:
-                report.notes.append(f"Nothing in the last day matched the standing topic “{topic}”.")
+                report.notes.append(f"Nothing since the previous edition matched the standing topic “{topic}”.")
 
         topic_budget = min(budget // 2, sum(target_words(c, wpm) for c, _ in topic_plan))
         top_plan = [(c, None) for c in clusters if id(c) not in taken and c.size > 1][:25]
