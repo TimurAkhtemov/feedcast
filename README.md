@@ -1,7 +1,7 @@
 # feedcast
 
 Reads a broad pool of RSS feeds, keeps what matters, and turns it into a narrated
-audio episode that shows up on your phone. Everything runs on this Mac: no cloud model
+audio episode that shows up on your phone. Everything runs on your Mac: no cloud model
 APIs.
 
 ```
@@ -33,7 +33,7 @@ Two modes:
 
 ## Setup
 
-Requirements, all already on this Mac: Python 3.12 + `uv`, `ffmpeg`, Ollama with
+Requirements: Python 3.12 + `uv`, `ffmpeg`, Ollama with
 `qwen3.6:35b` and `embeddinggemma`, and Docker Desktop (only for the SearXNG fallback).
 
 ```bash

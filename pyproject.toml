@@ -1,7 +1,7 @@
 [project]
 name = "feedcast"
 version = "0.1.0"
-description = "Condense a pool of RSS feeds into a narrated audio episode, all on this Mac"
+description = "Condense a pool of RSS feeds into a narrated audio episode, all on your Mac"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

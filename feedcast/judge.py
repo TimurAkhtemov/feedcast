@@ -51,10 +51,10 @@ class Backend(Protocol):
 class LayaBackend:
     """Pinned Laya checkpoint on Metal, batching questions across items.
 
-    `Agent.predict` only batches
-    questions within one state, so this prepares every (item, question) sequence with the
-    agent's own tokenizer, runs them in shared length-sorted batches, and applies the same
-    temperature scaling `Agent.predict` uses for noul answers.
+    `Agent.predict` only batches questions within one state, so this prepares every
+    (item, question) sequence with the agent's own tokenizer, runs them in shared
+    length-sorted batches, and applies the same temperature scaling `Agent.predict` uses
+    for noul answers.
     """
 
     name = "laya"
