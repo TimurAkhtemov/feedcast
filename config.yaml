@@ -1,0 +1,56 @@
+# feedcast settings. Every key is optional; feedcast/config.py holds the defaults.
+
+judge:
+  # Laya answers yes/no with P(yes). These are the cutoffs. Every judgment is logged to
+  # the `judgments` table in data/feedcast.db so these can be tuned from real answers.
+  # First real run (723 items): at 0.5, 11 flagged but only ~3 were deal posts; Laya
+  # also says yes to articles *about* ads, scams, or products. Ads rarely cluster
+  # across outlets, so a missed one seldom becomes a story: favor precision.
+  ad_threshold: 0.8        # drop an item when P(mainly an ad / sponsored) >= this
+  topic_threshold: 0.5     # keep an item for a topic when P(about the topic) >= this
+  batch_size: 16
+  # On-demand topics are first shortlisted by embedding similarity, then judged by Laya.
+  shortlist: 400
+
+ingest:
+  max_entries_per_feed: 40
+  max_age_hours: 72        # ignore feed entries older than this
+  keep_days: 21            # prune items older than this from the pool
+  concurrency: 8
+  timeout_seconds: 20
+
+group:
+  embed_model: embeddinggemma
+  # Average-link cosine similarity above which two items count as the same story.
+  # 0.8 split one 10-outlet story in two on real data; 0.75 kept stories whole and pure.
+  similarity: 0.75
+
+edition:
+  target_minutes: 12
+  window_hours: 24
+  # Clusters picked per standing topic in topics.yaml.
+  topic_stories: 2
+
+ask:
+  target_minutes: 6
+  window_hours: 96
+  min_matches: 5           # below this, search SearXNG for more coverage
+  search_queries: 3
+  max_stories: 5
+
+write:
+  model: qwen3.6:35b
+  temperature: 0.4
+  words_per_minute: 150    # Kokoro af_heart at speed 1.0, measured from real episodes
+  max_source_chars: 14000  # cluster text handed to Qwen (and checked for grounding)
+
+voice:
+  model: mlx-community/Kokoro-82M-bf16
+  voice: af_heart
+  speed: 1.0
+  bitrate: 96k
+  target_lufs: -16
+
+services:
+  ollama_url: http://127.0.0.1:11434
+  searxng_url: http://127.0.0.1:8888

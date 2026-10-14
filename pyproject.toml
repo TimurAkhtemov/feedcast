@@ -17,6 +17,7 @@ dependencies = [
     "mlx-audio>=0.5.9,<0.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "misaki[en]>=0.9.4,<0.10 ; platform_machine == 'arm64' and sys_platform == 'darwin'",
     "en-core-web-sm ; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "scipy>=1.13,<2",
 ]
 
 [project.scripts]
