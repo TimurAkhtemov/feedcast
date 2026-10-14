@@ -1,0 +1,38 @@
+# feedcast's local SearXNG: JSON API on, no limiter, English news first.
+# Only reachable on 127.0.0.1 (see docker-compose.yml), so the committed key is fine.
+use_default_settings: true
+
+general:
+  instance_name: "feedcast"
+
+search:
+  autocomplete: ""
+  default_lang: "en"
+  formats: [html, json]
+
+server:
+  secret_key: "ee59919d4648d3ed6d72db9a76263afa29e0aace8c59214a8d16b03c9f295b8e"
+  limiter: false
+  image_proxy: false
+  public_instance: false
+
+outgoing:
+  # Bing drops SearXNG's HTTP/2 connections; over HTTP/1.1 it answers.
+  enable_http2: false
+  request_timeout: 6.0
+
+engines:
+  # Blocked from here when tested (403, 401, 429); skip them instead of waiting on them.
+  - name: google news
+    disabled: true
+  - name: brave.news
+    disabled: true
+  - name: reuters
+    disabled: true
+  # These ignore time_range, so SearXNG would leave them out of time-limited searches
+  # and Bing would be the only source. feedcast.search drops results older than the range.
+  - name: duckduckgo news
+    time_range_support: true
+  - name: yahoo news
+    inactive: false
+    time_range_support: true
