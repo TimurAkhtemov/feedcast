@@ -1,7 +1,57 @@
 # The feed pool. Keep it broad: topics are picked from it per episode,
-# so feeds don't need to be organized by topic.
+# so feeds don't need to be organized by topic. `name` is the outlet as it should be
+# spoken ("reported by ..."); several feeds can share one outlet name, and an outlet
+# counts once toward a story's importance.
 #
-# feeds:
-#   - name: Example Outlet
-#     url: https://example.com/rss
-feeds: []
+# Every URL here was checked with `feedcast feeds verify` (valid feed, entries with
+# titles and links, newest entry under a week old) on 2026-10-13.
+# Add more with `feedcast feeds import-opml FILE` or by hand, then run verify.
+feeds:
+  # World
+  - {name: BBC News, url: "https://feeds.bbci.co.uk/news/world/rss.xml"}
+  - {name: Al Jazeera, url: "https://www.aljazeera.com/xml/rss/all.xml"}
+  - {name: The Guardian, url: "https://www.theguardian.com/world/rss"}
+  - {name: NPR, url: "https://feeds.npr.org/1004/rss.xml"}
+  - {name: DW, url: "https://rss.dw.com/rdf/rss-en-all"}
+  - {name: France 24, url: "https://www.france24.com/en/rss"}
+  - {name: CBC News, url: "https://www.cbc.ca/webfeed/rss/rss-world"}
+  - {name: UN News, url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml"}
+  - {name: Sky News, url: "https://feeds.skynews.com/feeds/rss/world.xml"}
+  - {name: The Independent, url: "https://www.independent.co.uk/news/world/rss"}
+  # US
+  - {name: NPR, url: "https://feeds.npr.org/1001/rss.xml"}
+  - {name: NPR, url: "https://feeds.npr.org/1014/rss.xml"}
+  - {name: PBS NewsHour, url: "https://www.pbs.org/newshour/feeds/rss/headlines"}
+  - {name: CBS News, url: "https://www.cbsnews.com/latest/rss/main"}
+  - {name: ABC News, url: "https://abcnews.go.com/abcnews/usheadlines"}
+  - {name: NBC News, url: "https://feeds.nbcnews.com/nbcnews/public/news"}
+  - {name: The Hill, url: "https://thehill.com/news/feed/"}
+  - {name: Politico, url: "https://rss.politico.com/politics-news.xml"}
+  - {name: Fox News, url: "https://moxie.foxnews.com/google-publisher/latest.xml"}
+  - {name: ProPublica, url: "https://feeds.propublica.org/propublica/main"}
+  # Business
+  - {name: CNBC, url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"}
+  - {name: CNBC, url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10001147"}
+  - {name: BBC News, url: "https://feeds.bbci.co.uk/news/business/rss.xml"}
+  - {name: The Guardian, url: "https://www.theguardian.com/uk/business/rss"}
+  - {name: NPR, url: "https://feeds.npr.org/1006/rss.xml"}
+  - {name: MarketWatch, url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"}
+  - {name: Federal Reserve, url: "https://www.federalreserve.gov/feeds/press_all.xml"}
+  # Tech
+  - {name: Ars Technica, url: "https://feeds.arstechnica.com/arstechnica/index"}
+  - {name: The Verge, url: "https://www.theverge.com/rss/index.xml"}
+  - {name: TechCrunch, url: "https://techcrunch.com/feed/"}
+  - {name: Engadget, url: "https://www.engadget.com/rss.xml"}
+  - {name: BBC News, url: "https://feeds.bbci.co.uk/news/technology/rss.xml"}
+  - {name: MIT Technology Review, url: "https://www.technologyreview.com/feed/"}
+  - {name: The Register, url: "https://www.theregister.com/headlines.atom"}
+  - {name: The Guardian, url: "https://www.theguardian.com/uk/technology/rss"}
+  # Science
+  - {name: NASA, url: "https://www.nasa.gov/news-release/feed/"}
+  - {name: ScienceDaily, url: "https://www.sciencedaily.com/rss/top/science.xml"}
+  - {name: Phys.org, url: "https://phys.org/rss-feed/"}
+  - {name: The Guardian, url: "https://www.theguardian.com/science/rss"}
+  - {name: BBC News, url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"}
+  - {name: NPR, url: "https://feeds.npr.org/1007/rss.xml"}
+  - {name: Space.com, url: "https://www.space.com/feeds/all"}
+  - {name: Live Science, url: "https://www.livescience.com/feeds/all"}
