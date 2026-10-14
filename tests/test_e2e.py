@@ -17,7 +17,7 @@ def _chapters(path):
 
 def test_default_edition_end_to_end(services):
     services.config["edition"]["target_minutes"] = 8
-    ep = edition(services, topics=["battery recycling"])
+    ep = edition(services, topics=["battery recycling"], skip=["sports"])
 
     assert not ep.failed
     assert ep.mp3.exists() and ep.notes.exists()
@@ -34,6 +34,8 @@ def test_default_edition_end_to_end(services):
     assert any("Battery" in c for c in chapters)
     # The sponsored post never became a story.
     assert not any("SoundMax" in c for c in chapters)
+    # Two outlets covered the championship final, but sports is on the skip list.
+    assert not any("Pelicans" in c for c in chapters)
 
     notes = ep.notes.read_text()
     assert "battery recycling" in notes
@@ -42,6 +44,8 @@ def test_default_edition_end_to_end(services):
     # HALLUCINATE_ALWAYS: rewritten once, still ungrounded, dropped and listed.
     assert "## Left out" in notes and "Council debates downtown parking rules" in notes
     assert "Zorblax" in notes
+    assert "## Skipped" in notes and "Pelicans win regional championship final" in notes
+    assert "sports, 2 outlets" in notes
     # HALLUCINATE_ONCE: fixed by the rewrite and kept.
     assert any("School lunch" in c for c in chapters)
 
@@ -49,6 +53,7 @@ def test_default_edition_end_to_end(services):
     questions = {q for (q,) in db.execute("SELECT DISTINCT question FROM judgments")}
     assert "Is this article mainly an advertisement or sponsored post?" in questions
     assert "Is this article about battery recycling?" in questions
+    assert "Is this article about sports?" in questions
     # Every item in the window got an ad judgment, and each one is logged with its threshold.
     n_items = db.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     ad_rows = db.execute(
@@ -57,11 +62,33 @@ def test_default_edition_end_to_end(services):
     assert ad_rows == (n_items, services.config["judge"]["ad_threshold"])
 
 
+def test_skip_list_needs_most_of_a_story_and_spares_standing_topics(services):
+    from feedcast.pipeline import run_ingest
+
+    # Only one of the three Harbor Bridge articles calls the repairs "costly": the story stays.
+    ep = edition(services, topics=[], skip=["costly"])
+    assert "Harbor Bridge" in _chapters(ep.mp3)[1]
+    assert "## Skipped" not in ep.notes.read_text()
+
+    # A standing topic is something you asked for, so the skip list doesn't block it.
+    ep = edition(services, topics=["championship final"], skip=["sports"], refresh=False)
+    assert any("Pelicans" in c for c in _chapters(ep.mp3))
+    assert "## Skipped" not in ep.notes.read_text()
+
+    # The hourly ingest answers the skip-list question ahead of time for new items.
+    services.store.db.execute("DELETE FROM items")
+    run_ingest(services, warm=True, skip=["sports"])
+    warmed = services.store.db.execute(
+        "SELECT COUNT(*) FROM judgments WHERE run_id = 'ingest' AND question = 'Is this article about sports?'"
+    ).fetchone()[0]
+    assert warmed == 11
+
+
 def test_edition_dedupes_and_extracts_full_text(services):
     edition(services, topics=[])
     db = services.store.db
     urls = [u for (u,) in db.execute("SELECT canonical_url FROM items")]
-    assert len(urls) == len(set(urls)) == 9
+    assert len(urls) == len(set(urls)) == 11
     assert all("utm_source" not in u for u in urls)
     # Full article text comes from the page, not the one-paragraph feed summary.
     bridge = db.execute("SELECT full_text, text FROM items WHERE title LIKE 'Harbor Bridge reopens%'").fetchone()
@@ -71,7 +98,7 @@ def test_edition_dedupes_and_extracts_full_text(services):
     assert "newsletter" not in leads and "By Staff Reporter" not in leads
     # A second run adds nothing new.
     edition(services, topics=[])
-    assert db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 9
+    assert db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 11
 
 
 def test_on_demand_falls_back_to_search_and_suggests_feeds(services):

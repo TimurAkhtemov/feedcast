@@ -21,8 +21,9 @@ Two modes:
 
 - **Default edition** (`feedcast edition`, launchd at 05:30 on Monday, Wednesday and
   Friday): the biggest stories across the whole pool since the previous edition (Monday's
-  covers the weekend), plus a story or two for each standing topic in `topics.yaml`.
-  About 12 minutes. Days, time, and length are in `config.yaml` → `edition`.
+  covers the weekend), plus a story or two for each standing topic in `topics.yaml`,
+  minus subjects on its skip list (sports, to start). About 12 minutes. Days, time, and
+  length are in `config.yaml` → `edition`.
 - **On-demand** (`feedcast ask "topic" ...`, or a `.txt` dropped in
   `iCloud Drive/Feedcast/requests/` from your phone): an episode on just those topics,
   built from the already-ingested pool in a minute or two. If fewer than 5 items match a
@@ -102,6 +103,30 @@ it if it's still a placeholder), builds the episode, and moves the request to
 `iCloud Drive/Feedcast/episodes/`. Open it from the Files app, or point a player
 that reads iCloud Drive at that folder.
 
+## Standing topics and the skip list
+
+`topics.yaml` holds two lists, both read by every edition:
+
+```yaml
+topics:            # each gets up to 2 stories of its own, even small ones
+  - semiconductor export controls
+skip:              # left out of the top stories
+  - sports
+```
+
+- A **standing topic** reserves room: up to `edition.topic_stories` of the most relevant
+  stories since the last edition, played after the top stories and taking at most half
+  the episode. For a one-off focus, ask for an on-demand episode instead.
+- The **skip list** removes stories from the top stories. Laya asks "Is this article
+  about sports?" of each article, and a story is skipped when its articles' average yes
+  is at least `judge.skip_threshold` (0.8). One outlet covering a news story from the
+  sports desk won't knock it out. Standing topics and on-demand requests ignore the skip
+  list, since those are things you asked for. Every skipped story is listed in the show
+  notes under **Skipped**, with its score, so you can tell if it's too aggressive.
+- Name the subject itself ("sports", "celebrity gossip"), never "news that isn't
+  sports": Laya handles negation badly. Subjects work better than moods ("upsetting
+  news"), which Laya judges less consistently.
+
 ## What you get
 
 Each episode is two files in `iCloud Drive/Feedcast/episodes/`:
@@ -131,8 +156,9 @@ are pruned.
 
 **Judge** (`feedcast/judge.py`): Laya answers yes/no only:
 "Is this article mainly an advertisement or sponsored post?" for every item, and
-"Is this article about <topic>?" once per requested topic. It never chooses among
-topics or feeds, because confidence isn't calibrated above about 10 options. Input is
+"Is this article about <topic>?" once per requested topic or skip-list subject. It
+never chooses among topics or feeds, because confidence isn't calibrated above about
+10 options. Input is
 the title plus the cleaned opening paragraph, fitted to Laya's 512-token budget
 (question included) with its own tokenizer; truncation is logged. Questions are
 batched across items and cached by exact input + question.
@@ -187,6 +213,11 @@ Calibration notes from the first real pool (723 items, 2026-10-13):
 - **Ad threshold:** at 0.5, 11 items were flagged but only ~3 were deal posts; Laya also
   says yes to articles *about* ads or products. Ads rarely cluster across outlets, so
   0.8 is used.
+- **Skip threshold:** "Is this article about sports?" on 997 items was bimodal: 956
+  below 0.1, 34 at 0.5 or higher, almost all real sports. Its mistakes sat between 0.5
+  and 0.7 (car-finance payouts 0.67, Netflix's World Cup rights 0.52), so 0.8 is used.
+  Only 2 multi-outlet sports stories turned up in that pool, and neither would have made
+  the edition anyway, so the list rarely changes an episode.
 - **Cluster similarity:** at 0.8, a 10-outlet story split in two. At 0.75, clusters
   stayed whole and pure.
 - **Speaking rate:** Kokoro `af_heart` reads about 133 words a minute, so

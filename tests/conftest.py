@@ -88,7 +88,8 @@ class KeywordEmbedder:
     """Fake embeddinggemma: each story keyword is a fixed direction."""
 
     name = "stub-embed"
-    KEYWORDS = ["bridge", "tessera", "battery", "soundmax", "parking", "lunch", "volcano", "recycling"]
+    KEYWORDS = ["bridge", "tessera", "battery", "soundmax", "parking", "lunch", "volcano", "recycling",
+                "pelicans"]
 
     def embed(self, texts):
         out = []

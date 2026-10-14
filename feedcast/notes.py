@@ -17,12 +17,22 @@ class FeedSuggestion:
 
 
 @dataclass
+class Skipped:
+    title: str
+    subject: str     # the skip-list entry it matched
+    outlets: int
+    p: float         # Laya's mean P(yes) across the story's articles
+    url: str
+
+
+@dataclass
 class RunReport:
     kind: str                                   # "edition" or "ask"
     title: str
     topics: list[str] = field(default_factory=list)
     stats: dict[str, int | str] = field(default_factory=dict)
     dropped: list[Dropped] = field(default_factory=list)
+    skipped: list[Skipped] = field(default_factory=list)
     suggestions: list[FeedSuggestion] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)  # warnings worth showing the listener
 
@@ -67,6 +77,17 @@ def show_notes(report: RunReport, segments: list[Segment], chapters: list[Chapte
             first = d.links[0] if d.links else None
             link = f" ([{_md(first[1])}]({first[2]}))" if first else ""
             lines.append(f"- {d.headline}: {d.reason}{link}")
+        lines.append("")
+
+    if report.skipped:
+        lines += ["## Skipped", "",
+                  "Left out because they're about a subject on the skip list in topics.yaml "
+                  "(Laya's average yes across the story's articles in brackets):", ""]
+        for s in report.skipped[:12]:
+            outlets = f"{s.outlets} outlet{'s' if s.outlets != 1 else ''}"
+            lines.append(f"- [{_md(s.title)}]({s.url}): {s.subject}, {outlets} ({s.p:.2f})")
+        if len(report.skipped) > 12:
+            lines.append(f"- and {len(report.skipped) - 12} more")
         lines.append("")
 
     if report.suggestions:

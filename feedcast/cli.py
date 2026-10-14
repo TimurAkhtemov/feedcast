@@ -69,6 +69,7 @@ def build_services(episodes_dir: Path | None = None):
 
 
 def cmd_ingest(args) -> int:
+    from feedcast.config import load_skip
     from feedcast.pipeline import run_guarded, run_ingest
 
     lock = open(paths.DATA_DIR / "ingest.lock", "w")
@@ -79,7 +80,7 @@ def cmd_ingest(args) -> int:
         return 0
     svc = build_services()
     try:
-        report = run_ingest(svc, warm=args.warm)
+        report = run_ingest(svc, warm=args.warm, skip=load_skip() if args.warm else ())
     except Exception as exc:
         # Hourly job: write a failure notice, but at most once per 12 hours per error,
         # so a long outage doesn't fill the episodes folder.
@@ -100,11 +101,12 @@ def _raise(step, exc):
 
 
 def cmd_edition(args) -> int:
-    from feedcast.config import load_topics
+    from feedcast.config import load_skip, load_topics
     from feedcast.pipeline import edition
 
     svc = build_services()
-    ep = edition(svc, topics=load_topics(), target_minutes=args.minutes, refresh=not args.no_ingest)
+    ep = edition(svc, topics=load_topics(), skip=load_skip(), target_minutes=args.minutes,
+                 refresh=not args.no_ingest)
     print(f"{'FAILED' if ep.failed else 'ok'}: {ep.mp3} ({ep.duration:.0f} s, {ep.segments} stories)")
     return 1 if ep.failed else 0
 

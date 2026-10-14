@@ -1,7 +1,16 @@
-# Standing topics for the default edition. Phrase each one positively
-# (Laya handles "not about X" badly).
+# Standing topics for the default edition: each gets up to edition.topic_stories
+# stories of its own in every edition. Phrase each one positively (Laya handles
+# "not about X" badly).
 #
 # topics:
 #   - semiconductor export controls
 #   - AI tooling for developers
 topics: []
+
+# Subjects left out of the edition's top stories. Laya asks "Is this article about
+# <subject>?" of each article and a story is skipped when the answer is mostly yes
+# (judge.skip_threshold in config.yaml). Name the subject itself ("sports"), not what
+# you want instead. Standing topics and on-demand requests ignore this list, and the
+# show notes list everything it skipped.
+skip:
+  - sports

@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import time
 import traceback
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
@@ -35,7 +35,7 @@ from feedcast.group import Cluster, cluster_items, embed_items, query_text, shor
 from feedcast.ingest import body_text, extract_article, ingest, pick_canonical
 from feedcast.judge import Backend, Judge
 from feedcast.llm import LLM, Embedder
-from feedcast.notes import FeedSuggestion, RunReport, failure_notes, show_notes
+from feedcast.notes import FeedSuggestion, RunReport, Skipped, failure_notes, show_notes
 from feedcast.search import SearchResult, SearchUnavailable
 from feedcast.speak import spoken
 from feedcast import voice
@@ -149,6 +149,33 @@ def drop_ads(svc: Services, judge: Judge, items: list[Item], report: RunReport) 
     ads = verdicts.yes
     report.stats["ads_filtered"] = int(report.stats.get("ads_filtered", 0)) + len(ads)
     return [it for it in items if it.id not in ads]
+
+
+def skip_stories(svc: Services, judge: Judge, clusters: list[Cluster], skip: Sequence[str],
+                 report: RunReport) -> list[Cluster]:
+    """Leave out stories about a subject on the skip list.
+
+    One yes/no question per subject ("Is this article about sports?"), asked of every
+    article in each story. A story is skipped when Laya's average P(yes) across its
+    articles reaches skip_threshold, so a news story that one outlet covered from the
+    sports pages stays in.
+    """
+    threshold = svc.config["judge"]["skip_threshold"]
+    kept = clusters
+    for subject in skip:
+        if not kept:
+            break
+        verdicts = judge.about([it for c in kept for it in c.items], subject, threshold)
+        still = []
+        for c in kept:
+            p = sum(verdicts.p[it.id] for it in c.items) / len(c.items)
+            if p >= threshold:
+                report.skipped.append(Skipped(c.title, subject, c.size, p, c.items[0].url))
+            else:
+                still.append(c)
+        kept = still
+    report.stats["stories_skipped"] = len(report.skipped)
+    return kept
 
 
 def write_plan(svc: Services, plan: list[tuple[Cluster, str | None]], budget: int,
@@ -312,8 +339,8 @@ def _record(svc: Services, run_id: str, status: str, detail: str, episode: Episo
 # ---------------------------------------------------------------- default edition
 
 
-def edition(svc: Services, *, topics: list[str], target_minutes: float | None = None,
-            refresh: bool = True) -> Episode:
+def edition(svc: Services, *, topics: list[str], skip: Sequence[str] = (),
+            target_minutes: float | None = None, refresh: bool = True) -> Episode:
     def build(step: Step) -> Episode:
         cfg = svc.config
         now = svc.now()
@@ -360,10 +387,19 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
                 report.notes.append(f"Nothing since the previous edition matched the standing topic “{topic}”.")
 
         topic_budget = min(budget // 2, sum(target_words(c, wpm) for c, _ in topic_plan))
-        top_plan = [(c, None) for c in clusters if id(c) not in taken and c.size > 1][:25]
+        # The skip list only applies here: standing topics and on-demand requests are
+        # things you asked for.
+        for subject in skip:
+            if warning := negation_warning(subject):
+                report.notes.append(warning)
+        rest = [c for c in clusters if id(c) not in taken]
+        if skip:
+            step(f"judging the skip list with Laya: {', '.join(skip)}")
+        multi = skip_stories(svc, judge, [c for c in rest if c.size > 1], skip, report)
+        top_plan = [(c, None) for c in multi[:25]]
         if len(top_plan) < 6:  # quiet news day: single-outlet stories, newest first
-            singles = sorted((c for c in clusters if id(c) not in taken and c.size == 1),
-                             key=lambda c: c.latest, reverse=True)
+            singles = sorted((c for c in rest if c.size == 1), key=lambda c: c.latest, reverse=True)
+            singles = skip_stories(svc, judge, singles[:24], skip, report)
             top_plan += [(c, None) for c in singles[: 12 - len(top_plan)]]
         # Topic stories are written first so the top stories can't eat their share,
         # but they're read after the top stories.
@@ -542,7 +578,7 @@ def _site_name(url: str) -> str:
 # ---------------------------------------------------------------- ingest
 
 
-def run_ingest(svc: Services, *, warm: bool = False):
+def run_ingest(svc: Services, *, warm: bool = False, skip: Sequence[str] = ()):
     cfg = svc.config["ingest"]
     now = svc.now().timestamp()
     report = ingest(svc.store, svc.feeds, client=svc.http, concurrency=cfg["concurrency"],
@@ -557,11 +593,14 @@ def run_ingest(svc: Services, *, warm: bool = False):
     if report.feeds_ok == 0 and svc.feeds:
         raise RuntimeError(f"all {len(svc.feeds)} feeds failed; first error: {report.feeds_failed[0][1]}")
     if warm and report.added:
-        # Precompute embeddings and ad answers so on-demand requests start warm.
+        # Precompute embeddings, ad answers, and skip-list answers so builds start warm.
         new = svc.store.items_by_id(report.added)
         try:
             embed_items(svc.store, svc.embedder, new)
-            Judge(svc.store, svc.backend, run_id="ingest").ads(new, svc.config["judge"]["ad_threshold"])
+            judge = Judge(svc.store, svc.backend, run_id="ingest")
+            judge.ads(new, svc.config["judge"]["ad_threshold"])
+            for subject in skip:
+                judge.about(new, subject, svc.config["judge"]["skip_threshold"])
         except Exception as exc:
             log.warning("warming caches failed (not fatal): %s", exc)
     return report

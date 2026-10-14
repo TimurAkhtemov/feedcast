@@ -18,7 +18,13 @@ from feedcast import paths
 CONFIG_FILE = paths.PROJECT_ROOT / "config.yaml"
 
 DEFAULTS: dict[str, dict[str, Any]] = {
-    "judge": {"ad_threshold": 0.8, "topic_threshold": 0.5, "batch_size": 16, "shortlist": 400},
+    "judge": {
+        "ad_threshold": 0.8,
+        "topic_threshold": 0.5,
+        "skip_threshold": 0.8,
+        "batch_size": 16,
+        "shortlist": 400,
+    },
     "ingest": {
         "max_entries_per_feed": 40,
         "max_age_hours": 72,
@@ -113,12 +119,22 @@ def edition_since(now: datetime, edition: dict[str, Any]) -> datetime:
     return latest  # no days scheduled
 
 
-def load_topics(path: Path | None = None) -> list[str]:
+def _topics_list(path: Path | None, key: str) -> list[str]:
     path = path or paths.TOPICS_FILE
     if not path.exists():
         return []
     data = yaml.safe_load(path.read_text()) or {}
-    return [str(t).strip() for t in data.get("topics") or [] if str(t).strip()]
+    return [str(t).strip() for t in data.get(key) or [] if str(t).strip()]
+
+
+def load_topics(path: Path | None = None) -> list[str]:
+    """Standing topics: each gets its own stories in every edition."""
+    return _topics_list(path, "topics")
+
+
+def load_skip(path: Path | None = None) -> list[str]:
+    """Subjects left out of the edition's top stories."""
+    return _topics_list(path, "skip")
 
 
 def negation_warning(topic: str) -> str | None:
