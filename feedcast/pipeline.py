@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+import numpy as np
 
 from feedcast import paths
 from feedcast import text as textutil
@@ -323,10 +324,9 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
             if warning := negation_warning(topic):
                 report.notes.append(warning)
             step(f"judging standing topic {topic!r} with Laya")
-            matched = topic_matches(svc, judge, items, vecs, topic)
-            report.stats[f"matches_{textutil.slug(topic, 30)}"] = len(matched)
-            ranked = [c for c in clusters if c.ids & matched and id(c) not in taken]
-            ranked.sort(key=lambda c: (len(c.ids & matched), c.size, c.latest), reverse=True)
+            relevance = topic_matches(svc, judge, items, vecs, topic)
+            report.stats[f"matches_{textutil.slug(topic, 30)}"] = len(relevance)
+            ranked = [c for c in by_relevance(clusters, relevance) if id(c) not in taken]
             for c in ranked[: cfg["edition"]["topic_stories"]]:
                 topic_plan.append((c, topic))
                 taken.add(id(c))
@@ -353,11 +353,24 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
         return run_guarded(svc, "edition", "", build)
 
 
-def topic_matches(svc: Services, judge: Judge, items: list[Item], vecs: dict, topic: str) -> set[int]:
-    """Embedding shortlist for recall, then one Laya yes/no question for precision."""
+def topic_matches(svc: Services, judge: Judge, items: list[Item], vecs: dict, topic: str) -> dict[int, float]:
+    """Embedding shortlist for recall, then one Laya yes/no question for precision.
+
+    Returns relevance (Laya's P(yes) plus cosine similarity to the topic) for the items
+    Laya said yes to. Laya reads compound topics loosely ("AI tooling for developers"
+    gets a yes from most AI news), so stories are ranked by relevance, not by size.
+    """
     topic_vec = svc.embedder.embed([query_text(topic)])[0]
+    topic_vec = topic_vec / max(float(np.linalg.norm(topic_vec)), 1e-12)
     candidates = shortlist(items, vecs, topic_vec, svc.config["judge"]["shortlist"])
-    return judge.about(candidates, topic, svc.config["judge"]["topic_threshold"]).yes
+    verdicts = judge.about(candidates, topic, svc.config["judge"]["topic_threshold"])
+    return {i: verdicts.p[i] + float(vecs[i] @ topic_vec) for i in verdicts.yes}
+
+
+def by_relevance(clusters: list[Cluster], relevance: dict[int, float]) -> list[Cluster]:
+    def score(c: Cluster) -> tuple:
+        return (max(relevance.get(i, 0.0) for i in c.ids), c.size, c.latest)
+    return sorted((c for c in clusters if c.ids & relevance.keys()), key=score, reverse=True)
 
 
 # ---------------------------------------------------------------- on-demand
@@ -385,8 +398,8 @@ def ask(svc: Services, topics: list[str], *, target_minutes: float | None = None
             if warning := negation_warning(topic):
                 report.notes.append(warning)
             step(f"judging {topic!r} with Laya")
-            matched_ids = topic_matches(svc, judge, items, vecs, topic)
-            matched = [it for it in items if it.id in matched_ids]
+            relevance = topic_matches(svc, judge, items, vecs, topic)
+            matched = [it for it in items if it.id in relevance]
             matched = drop_ads(svc, judge, matched, report)
             report.stats[f"pool_matches_{textutil.slug(topic, 30)}"] = len(matched)
             if len(matched) < cfg["ask"]["min_matches"]:
@@ -394,12 +407,13 @@ def ask(svc: Services, topics: list[str], *, target_minutes: float | None = None
                 found = search_fallback(svc, judge, topic, report, step)
                 matched += [it for it in found if it.id not in {m.id for m in matched}]
                 vecs.update(embed_items(svc.store, svc.embedder, found))
+                relevance.update({it.id: relevance.get(it.id, 1.0) for it in found})
             if not matched:
                 report.notes.append(f"No coverage of “{topic}” in the last {cfg['ask']['window_hours']} hours.")
                 plans.append([])
                 continue
             step(f"grouping stories for {topic!r}")
-            clusters = cluster_items(matched, vecs, cfg["group"]["similarity"])
+            clusters = by_relevance(cluster_items(matched, vecs, cfg["group"]["similarity"]), relevance)
             plans.append([(c, topic) for c in clusters[: cfg["ask"]["max_stories"]]])
 
         # Interleave topics so each gets a fair share of the budget.
@@ -427,7 +441,8 @@ def search_fallback(svc: Services, judge: Judge, topic: str, report: RunReport,
     if svc.search is None or not svc.searx_up():
         report.notes.append("Web search was skipped: the local SearXNG instance isn't running.")
         return []
-    queries = search_queries(svc.llm, topic, svc.config["ask"]["search_queries"])
+    queries = search_queries(svc.llm, topic, svc.config["ask"]["search_queries"],
+                             today=date_text(svc.now()) + f", {svc.now():%Y}")
     report.stats[f"search_queries_{textutil.slug(topic, 30)}"] = " | ".join(queries)
     results: dict[str, SearchResult] = {}
     for q in queries:

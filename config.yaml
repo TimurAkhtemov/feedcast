@@ -41,7 +41,9 @@ ask:
 write:
   model: qwen3.6:35b
   temperature: 0.4
-  words_per_minute: 150    # Kokoro af_heart at speed 1.0, measured from real episodes
+  # Kokoro af_heart at speed 1.0 measured 126-148 wpm per segment, 133 overall, including
+  # paragraph pauses (data/transcripts/). Written words expand a little when spoken.
+  words_per_minute: 130
   max_source_chars: 14000  # cluster text handed to Qwen (and checked for grounding)
 
 voice:

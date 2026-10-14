@@ -257,10 +257,12 @@ def _join(parts: list[str]) -> str:
     return f"{', '.join(parts[:-1])} and {parts[-1]}"
 
 
-def search_queries(llm: LLM, topic: str, n: int = 3) -> list[str]:
+def search_queries(llm: LLM, topic: str, n: int = 3, today: str = "") -> list[str]:
     system = (
-        f"Write {n} distinct web search queries that would find recent English-language news "
-        "coverage of the topic. Each 2 to 6 words, no quotes or search operators."
+        f"Write {n} distinct web search queries that would find English-language news from "
+        "the past week about the topic. Each 2 to 6 words, no quotes or search operators. "
+        "Do not put a year in the query."
+        + (f" Today is {today}." if today else "")
     )
     data = llm.json(system, f"Topic: {topic}\nReturn JSON.", QUERIES_SCHEMA)
     queries = [q.strip().strip('"') for q in data.get("queries") or [] if q.strip()]

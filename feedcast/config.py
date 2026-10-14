@@ -37,7 +37,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "write": {
         "model": "qwen3.6:35b",
         "temperature": 0.4,
-        "words_per_minute": 150,
+        "words_per_minute": 130,
         "max_source_chars": 14000,
     },
     "voice": {

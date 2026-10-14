@@ -13,7 +13,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 TRACKING_PARAMS = {
     "fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid", "ocid", "cmpid", "taid",
-    "smid", "smtyp", "ref", "ref_src", "referrer", "source", "src", "via", "feature",
+    "smid", "smtyp", "cmp", "ref", "ref_src", "referrer", "source", "src", "via", "feature",
     "partner", "cid", "icid", "ito", "itm_source", "itm_medium", "itm_campaign", "at_medium",
     "at_campaign", "at_custom1", "at_custom2", "at_custom3", "at_custom4", "spm", "guccounter",
     "guce_referrer", "guce_referrer_sig", "rss", "mod", "traffic_source", "xtor",
