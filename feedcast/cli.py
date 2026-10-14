@@ -86,7 +86,7 @@ def cmd_ingest(args) -> int:
         detail = f"{type(exc).__name__}: {exc}"
         last = svc.store.last_failure("ingest", detail)
         if last is None or time.time() - last > 12 * 3600:
-            run_guarded(svc, "ingest", "", lambda step: _raise(step, exc))
+            run_guarded(svc, "ingest", "", lambda step: _raise(step, exc), lock=False)
         else:
             log.error("ingest failed again (notice already written): %s", detail)
         return 1

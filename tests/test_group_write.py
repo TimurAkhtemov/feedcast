@@ -119,3 +119,28 @@ def test_topic_stories_rank_by_relevance_not_size():
     ranked = by_relevance(clusters, relevance)
     assert ranked[0].title == "Volcano sensors"
     assert len(ranked) == 2
+
+
+def test_outlets_outside_the_pack_are_not_allowed_names():
+    store = Store(":memory:")
+    items = _items(store, [(f"Outlet {c}", f"Bridge story {c}", "The bridge reopened on Monday. " * 20)
+                           for c in "ABCDEFG"])
+    from feedcast.write import build_pack, segment_issues
+
+    pack = build_pack(Cluster(items), max_chars=6000)
+    left_out = [o for o in pack.outlets if o not in pack.text]  # only six of seven go in
+    assert len(left_out) == 1
+    letter = left_out[0].split()[-1]
+    assert segment_issues("Bridge reopens", [f"{left_out[0]} covered the bridge."], pack) == [letter]
+
+
+def test_degenerate_rewrite_is_dropped():
+    class Terse(FakeQwen):
+        def json(self, system, user, schema):
+            self.prompts.append(user)
+            return {"headline": "Bridge reopens", "paragraphs": ["The bridge reopened."] * 3}
+
+    store = Store(":memory:")
+    items = _items(store, [("A", "Bridge reopens", "The bridge reopened. " * 40)])
+    result = write_segment(Terse(), Cluster(items), words=100)
+    assert isinstance(result, Dropped) and "too short" in result.reason

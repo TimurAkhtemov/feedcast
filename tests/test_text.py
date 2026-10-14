@@ -49,3 +49,14 @@ def test_content_hash_ignores_case_and_punctuation():
     body = "The Senate voted on Tuesday. " * 10
     assert content_hash("A", body) == content_hash("B", body.upper().replace(".", "!"))
     assert content_hash("A", "short") != content_hash("B", "short")
+
+
+def test_canonical_from_page_only_on_the_same_registrable_domain():
+    from feedcast.ingest import pick_canonical
+
+    assert pick_canonical("https://news.bbc.co.uk/story/1", "https://evil.co.uk/phish") == \
+        "https://news.bbc.co.uk/story/1"
+    assert pick_canonical("https://www.bbc.co.uk/news/1", "https://www.bbc.co.uk/news/articles/1") == \
+        "https://bbc.co.uk/news/articles/1"
+    assert pick_canonical("https://example.com/a?utm_source=x", "https://example.com/") == \
+        "https://example.com/a"

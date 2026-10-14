@@ -139,9 +139,14 @@ def pick_canonical(link: str, page_canonical: str | None) -> str:
     return page_c if same_site and has_path else link_c
 
 
+SECOND_LEVEL = {"co", "com", "org", "net", "gov", "ac", "edu", "ne", "or"}
+
+
 def _site(url: str) -> str:
-    host = httpx.URL(url).host
-    return ".".join(host.split(".")[-2:])
+    """Registrable domain, roughly: bbc.co.uk, not co.uk."""
+    labels = httpx.URL(url).host.split(".")
+    keep = 3 if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in SECOND_LEVEL else 2
+    return ".".join(labels[-keep:])
 
 
 def body_text(title: str, text: str) -> str:

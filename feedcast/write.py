@@ -151,7 +151,7 @@ def target_words(cluster: Cluster, words_per_minute: int) -> int:
     """60 to 120 seconds: bigger stories and richer sources get more time."""
     seconds = 68 + 7 * min(cluster.size - 1, 6)  # 68 to 110 s, leaving room under 120
     if sum(len(it.text) for it in cluster.items) < 1500:
-        seconds = 62
+        seconds = 68
     return round(seconds / 60 * words_per_minute)
 
 
@@ -162,9 +162,10 @@ def _clean(draft: dict) -> tuple[str, list[str]]:
 
 
 def segment_issues(headline: str, paras: list[str], pack: SourcePack) -> list[str]:
-    body = grounding.unsupported("\n\n".join(paras), pack.text, allowed=pack.outlets)
-    head = grounding.unsupported(headline, pack.text, allowed=pack.outlets,
-                                 title_case=grounding.looks_title_case(headline))
+    # No allowlist: the outlets Qwen saw are already named in pack.text, and the
+    # attribution line is added after this check.
+    body = grounding.unsupported("\n\n".join(paras), pack.text)
+    head = grounding.unsupported(headline, pack.text, title_case=grounding.looks_title_case(headline))
     return body + [w for w in head if w not in body]
 
 
@@ -205,8 +206,13 @@ def write_segment(llm: LLM, cluster: Cluster, *, words: int, max_chars: int = 14
         )
         headline, paras = _clean(llm.json(system, retry, SEGMENT_SCHEMA))
         issues = segment_issues(headline, paras, pack)
-        if issues or not paras:
-            reason = "unsupported after rewrite: " + ", ".join(issues) if issues else "empty draft"
+        n_words = sum(word_count(p) for p in paras)
+        # Thin sources can't fill a full slot and that's fine; a few words isn't a story.
+        if issues or n_words < 0.3 * words:
+            if issues:
+                reason = "unsupported after rewrite: " + ", ".join(issues)
+            else:
+                reason = f"too short after rewrite: {n_words} words for a {words}-word slot"
             log.info("dropping %r: %s", cluster.title, reason)
             return Dropped(headline or cluster.title, reason, pack.links)
     while sum(word_count(p) for p in paras) > 1.3 * words and len(paras) > 2:

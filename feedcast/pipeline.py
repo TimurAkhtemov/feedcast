@@ -18,7 +18,7 @@ import time
 import traceback
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -52,6 +52,7 @@ from feedcast.write import (
 log = logging.getLogger("feedcast.pipeline")
 
 INTRO_OUTRO_WORDS = 80
+FAILED_MP3 = Path(__file__).parent / "assets" / "failed.mp3"  # when even ffmpeg is broken
 LOCK_WAIT_SECONDS = 45 * 60
 
 
@@ -160,7 +161,8 @@ def write_plan(svc: Services, plan: list[tuple[Cluster, str | None]], budget: in
     for n, (cluster, topic) in enumerate(plan, 1):
         if used >= budget - 0.5 * target_words(cluster, wpm):
             break
-        words = min(target_words(cluster, wpm), max(round(62 / 60 * wpm), budget - used))
+        # Never below ~68 s worth: Kokoro's pace varies, and segments must stay over 60 s.
+        words = min(target_words(cluster, wpm), max(round(68 / 60 * wpm), budget - used))
         step(f"writing story {n} of up to {len(plan)}: {cluster.title[:60]}")
         result = write_segment(svc.llm, cluster, words=words, max_chars=max_chars, topic=topic)
         if isinstance(result, Dropped):
@@ -230,18 +232,27 @@ def write_failure(svc: Services, kind: str, label: str, step: str, exc: BaseExce
         f"The error was: {_speakable(str(exc) or type(exc).__name__)}.",
         "The show notes have the details.",
     ]
-    mp3 = svc.episodes_dir / f"{stem}.mp3"
-    try:
-        synth = svc.synth_factory()
-    except Exception:
-        synth = None
-    result = voice.render_notice([spoken(l) for l in lines], mp3, title=f"Feedcast: {kind} failed",
-                                 synth=synth)
+    # Notes first: they need nothing but the filesystem.
     notes = svc.episodes_dir / f"{stem}.md"
     detail = "".join(traceback.format_exception(exc))
     _write_atomic(notes, failure_notes(f"Feedcast {kind} failed — {date_text(now)}", kind, step,
                                        error, detail))
-    return Episode(mp3, notes, result.duration, 0, failed=True)
+    mp3 = svc.episodes_dir / f"{stem}.mp3"
+    try:
+        try:
+            synth = svc.synth_factory()
+        except Exception:
+            synth = None
+        result = voice.render_notice([spoken(l) for l in lines], mp3,
+                                     title=f"Feedcast: {kind} failed", synth=synth)
+        duration = result.duration
+    except Exception:
+        log.exception("could not render the failure notice; using the bundled one")
+        tmp = mp3.with_name(f".{mp3.name}.tmp")
+        shutil.copyfile(FAILED_MP3, tmp)
+        os.replace(tmp, mp3)
+        duration = 0.0
+    return Episode(mp3, notes, duration, 0, failed=True)
 
 
 def write_notice(svc: Services, kind: str, label: str, title: str, lines: list[str],
@@ -270,19 +281,32 @@ def _speakable(message: str) -> str:
     return message[:200]
 
 
-def run_guarded(svc: Services, kind: str, label: str, fn: Callable[[Step], Episode]) -> Episode:
+def run_guarded(svc: Services, kind: str, label: str, fn: Callable[[Step], Episode], *,
+                lock: bool = True) -> Episode:
+    """Run `fn`; on any exception, including waiting for the lock or recording the run,
+    deliver a failure notice instead."""
     step = Step(kind)
     run_id = f"{kind}-{svc.now():%Y%m%d-%H%M%S}"
-    svc.store.start_run(run_id, kind)
     try:
-        episode = fn(step)
+        step("waiting for another build to finish")
+        with build_lock() if lock else nullcontext():
+            step("recording the run")
+            svc.store.start_run(run_id, kind)
+            episode = fn(step)
     except Exception as exc:
         log.exception("%s failed while %s", kind, step.name)
         episode = write_failure(svc, kind, label, step.name, exc)
-        svc.store.finish_run(run_id, "failed", f"{step.name}: {exc}", str(episode.mp3))
+        _record(svc, run_id, "failed", f"{step.name}: {exc}", episode)
         return episode
-    svc.store.finish_run(run_id, "ok", f"{episode.segments} stories", str(episode.mp3))
+    _record(svc, run_id, "ok", f"{episode.segments} stories", episode)
     return episode
+
+
+def _record(svc: Services, run_id: str, status: str, detail: str, episode: Episode) -> None:
+    try:
+        svc.store.finish_run(run_id, status, detail, str(episode.mp3))
+    except Exception:
+        log.exception("could not record run %s", run_id)
 
 
 # ---------------------------------------------------------------- default edition
@@ -350,8 +374,7 @@ def edition(svc: Services, *, topics: list[str], target_minutes: float | None = 
             raise RuntimeError("every story failed the grounding check; nothing left to read")
         return render_and_deliver(svc, report, segments, episode_stem(now, "edition"), step)
 
-    with build_lock():
-        return run_guarded(svc, "edition", "", build)
+    return run_guarded(svc, "edition", "", build)
 
 
 def topic_matches(svc: Services, judge: Judge, items: list[Item], vecs: dict, topic: str) -> dict[int, float]:
@@ -431,8 +454,7 @@ def ask(svc: Services, topics: list[str], *, target_minutes: float | None = None
             return write_notice(svc, "ask", label, report.title, lines, report)
         return render_and_deliver(svc, report, segments, stem, step)
 
-    with build_lock():
-        return run_guarded(svc, "ask", label, build)
+    return run_guarded(svc, "ask", label, build)
 
 
 def search_fallback(svc: Services, judge: Judge, topic: str, report: RunReport,

@@ -6,3 +6,4 @@ data/
 *.db
 *.mp3
 *.wav
+!feedcast/assets/failed.mp3

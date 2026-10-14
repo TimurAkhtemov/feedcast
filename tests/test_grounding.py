@@ -80,3 +80,17 @@ def test_date_abbreviations_and_spelled_ordinals():
     assert unsupported("It was the first time.", src) == []  # lone ordinals aren't figures
     assert unsupported("Sold on September twentieth.", src) == ["twentieth"]
     assert unsupported("Sold on October fifth.", src) == ["fifth"]
+
+
+def test_scale_must_match_not_just_the_mantissa():
+    assert unsupported("3 billion people arrived.", "3 people arrived.") == ["3 billion"]
+    assert unsupported("3 people arrived.", "3 billion people arrived.") == ["3"]
+
+
+def test_leading_decimals_unicode_mixed_case_and_acronyms():
+    src = "Nothing happened."
+    assert unsupported("Rates rose .5 percent.", src) == [".5"]
+    assert unsupported("The Élysée said so.", src) == ["Élysée"]
+    assert unsupported("Sales of the iPhone rose.", src) == ["iPhone"]
+    assert unsupported("COVID spread. NATO met. The AI model shipped.", src) == ["COVID", "NATO", "AI"]
+    assert unsupported("NATO met.", "Leaders of NATO met.") == []

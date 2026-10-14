@@ -135,3 +135,32 @@ def test_watch_builds_requests_from_the_phone(services, tmp_path):
     assert not list(requests.glob("*.txt"))
     assert len(list((requests / "done").glob("Ask Feedcast-*.txt"))) == 1
     assert len(list((requests / "failed").glob("blank-*.txt"))) == 1
+
+
+def test_lock_timeout_still_writes_a_notice(services, monkeypatch):
+    from contextlib import contextmanager
+
+    from feedcast import pipeline
+
+    @contextmanager
+    def stuck(wait=0):
+        raise TimeoutError("another feedcast build held the lock for 45 minutes")
+        yield
+
+    monkeypatch.setattr(pipeline, "build_lock", stuck)
+    ep = edition(services, topics=[])
+    assert ep.failed and ep.mp3.exists()
+    assert "waiting for another build" in ep.notes.read_text()
+
+
+def test_broken_ffmpeg_falls_back_to_bundled_notice(services, monkeypatch):
+    from feedcast import pipeline
+
+    def no_ffmpeg(*args, **kwargs):
+        raise FileNotFoundError("ffmpeg is not installed")
+
+    monkeypatch.setattr(pipeline.voice, "render_episode", no_ffmpeg)
+    monkeypatch.setattr(pipeline.voice, "render_notice", no_ffmpeg)
+    ep = edition(services, topics=[])
+    assert ep.failed and ep.mp3.read_bytes() == pipeline.FAILED_MP3.read_bytes()
+    assert "ffmpeg is not installed" in ep.notes.read_text()

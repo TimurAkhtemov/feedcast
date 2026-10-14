@@ -46,11 +46,11 @@ SCALES = {"hundred": 100, "thousand": 1e3, "million": 1e6, "billion": 1e9, "tril
 ABBREV_SCALES = {"k": 1e3, "m": 1e6, "mn": 1e6, "bn": 1e9, "b": 1e9, "tn": 1e12, "t": 1e12}
 
 DIGITS_RE = re.compile(
-    r"(?<![\w.,])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?!\d)"
+    r"(?<![\w.,])(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(?:\.(\d+))?(?!\d)"
     r"(?:\s+(thousand|million|billion|trillion)\b|(bn|mn|tn|m|k|b|t)\b)?",
     re.IGNORECASE,
 )
-WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’.&-]*")
+WORD_RE = re.compile(r"[^\W\d_][\w'’.&-]*")
 SENTENCE_RE = re.compile(r"(?<=[.!?:;])[\"'”’)\]]*\s+|\n+")
 
 ALIASES = [
@@ -69,7 +69,7 @@ ALIASES = [
     {"tue.", "tues.", "tuesday"}, {"wed.", "wednesday"}, {"thu.", "thurs.", "thursday"},
     {"fri.", "friday"}, {"sat.", "saturday"}, {"sun.", "sunday"},
 ]
-ALWAYS_OK = {"i", "feedcast", "ok", "tv", "ai", "ceo", "gdp", "covid"}
+ALWAYS_OK = {"i", "feedcast", "ok"}
 # Words that start sentences and are never names, so a sentence-initial capital on
 # them says nothing. Anything else sentence-initial counts as a name unless its
 # lowercase form appears as an ordinary word in the segment or the sources.
@@ -127,7 +127,7 @@ def numbers_in(text: str) -> list[NumberMention]:
     out = []
     for m in DIGITS_RE.finditer(text):
         whole, frac, word, abbr = m.groups()
-        value = float(whole.replace(",", "") + (f".{frac}" if frac else ""))
+        value = float((whole.replace(",", "") or "0") + (f".{frac}" if frac else ""))
         scale = SCALES.get((word or "").lower()) or ABBREV_SCALES.get((abbr or "").lower(), 1.0)
         out.append(NumberMention(m.group(0), value, scale, len(frac or "")))
     # Mask digit matches so "3.2 million" doesn't also yield a bare "million".
@@ -182,15 +182,15 @@ def number_supported(mention: NumberMention, source_numbers: list[NumberMention]
                      source_lower: str) -> bool:
     if mention.raw.lower() in source_lower and not mention.raw[0].isdigit():
         return True  # spelled out exactly as the source spells it
-    targets = {mention.value, mention.scaled}
+    # Compare full values only: "3 billion" must not match a bare "3".
+    target = mention.scaled
     for s in source_numbers:
-        for sv in {s.value, s.scaled}:
-            if any(abs(sv - t) <= 1e-9 * max(1.0, abs(t)) for t in targets):
-                return True
-            for scale in {1.0, mention.scale}:
-                x = sv / scale
-                if x and round(x, mention.decimals) == mention.value and abs(x - mention.value) <= 0.05 * abs(x):
-                    return True
+        sv = s.scaled
+        if abs(sv - target) <= 1e-9 * max(1.0, abs(target)):
+            return True
+        x = sv / mention.scale  # the source figure in the segment's unit, for rounding
+        if x and round(x, mention.decimals) == mention.value and abs(x - mention.value) <= 0.05 * abs(x):
+            return True
     return False
 
 
@@ -206,11 +206,13 @@ def proper_nouns_in(text: str, context_lower: str, *, title_case: bool = False) 
     for sentence in SENTENCE_RE.split(text):
         for idx, m in enumerate(WORD_RE.finditer(sentence.lstrip("\"'“‘(["))):
             word = _clean_word(m.group(0))
-            if not word or not word[0].isupper() or word.lower() in ALWAYS_OK:
+            mixed_case = any(c.isupper() for c in word[1:]) and not word[0].isupper()  # iPhone
+            if not word or not (word[0].isupper() or mixed_case) or word.lower() in ALWAYS_OK:
                 continue
             if all(p in UNITS or p in TENS or p in SCALES for p in word.lower().split("-")):
                 continue  # "Twelve" starting a sentence is a number, checked as one
-            if idx == 0 or title_case:
+            acronym = len(word.replace(".", "")) >= 2 and word.isupper()  # NATO, COVID, U.S.
+            if (idx == 0 or title_case) and not mixed_case and not acronym:
                 lw = word.lower()
                 if is_dictionary_word(word) or re.search(
                     rf"(?<![A-Za-z]){re.escape(lw)}(?![A-Za-z])", context_lower
@@ -273,7 +275,7 @@ def unsupported(text: str, source: str, *, allowed: Iterable[str] = (),
     context_lower = f"{text}\n{source}"
     # Only lowercase occurrences show a word is ordinary, so compare against a copy
     # where capitalized words are masked out.
-    ordinary = re.sub(r"\b[A-Z][A-Za-z]*", " ", context_lower)
+    ordinary = re.sub(r"\b[^\W\d_a-z][\w]*", " ", context_lower)
     for word in proper_nouns_in(names_text, ordinary, title_case=title_case):
         if name_supported(word, source_lower) or name_supported(word, allowed_lower):
             continue
