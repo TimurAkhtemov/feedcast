@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Fixture subscriptions</title></head>
+  <body>
+    <outline text="News">
+      <outline title="First Feed" text="Ignored fallback" xmlUrl="HTTP://Example.com:80/feed/" />
+      <outline text="Second Feed" xmlUrl="https://second.example/atom?view=full#latest" />
+      <outline text="Nested group">
+        <outline xmlUrl="https://third.example/rss" />
+      </outline>
+    </outline>
+    <outline text="Duplicate First" xmlUrl="https://example.com/feed" />
+    <outline text="A web link only" htmlUrl="https://ignored.example/" />
+  </body>
+</opml>

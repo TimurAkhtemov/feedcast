@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Fixture RSS</title>
+    <link>https://example.com/rss</link>
+    <description>A small RSS fixture.</description>
+    <item>
+      <title>Newest RSS story</title>
+      <link>https://example.com/rss/newest</link>
+      <pubDate>Tue, 30 Sep 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Older RSS story</title>
+      <link>https://example.com/rss/older</link>
+      <pubDate>Mon, 29 Sep 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Missing link is not counted</title>
+      <pubDate>Sun, 28 Sep 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

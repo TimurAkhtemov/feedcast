@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Stale Fixture</title>
+    <link>https://example.com/stale</link>
+    <description>An intentionally old feed.</description>
+    <item>
+      <title>Old story</title>
+      <link>https://example.com/stale/story</link>
+      <pubDate>Mon, 31 Aug 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
