@@ -1,0 +1,19 @@
+# Local SearXNG for feedcast's on-demand search fallback.
+# Published on 127.0.0.1 only, so nothing outside this Mac can reach it.
+name: feedcast-searxng
+
+services:
+  searxng:
+    image: searxng/searxng:2026.9.25-12f8b6515
+    container_name: feedcast-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      # Mount the file, not the folder: the entrypoint chowns /etc/searxng and
+      # would fail on a read-only directory mount.
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+      - cache:/var/cache/searxng
+
+volumes:
+  cache:
