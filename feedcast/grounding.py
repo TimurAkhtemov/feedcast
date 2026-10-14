@@ -36,6 +36,12 @@ TENS = {
     "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
     "eighty": 80, "ninety": 90,
 }
+ORDINALS = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7,
+    "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12, "thirteenth": 13,
+    "fourteenth": 14, "fifteenth": 15, "sixteenth": 16, "seventeenth": 17, "eighteenth": 18,
+    "nineteenth": 19, "twentieth": 20, "thirtieth": 30, "fortieth": 40, "fiftieth": 50,
+}
 SCALES = {"hundred": 100, "thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12}
 ABBREV_SCALES = {"k": 1e3, "m": 1e6, "mn": 1e6, "bn": 1e9, "b": 1e9, "tn": 1e12, "t": 1e12}
 
@@ -57,6 +63,11 @@ ALIASES = [
     {"capt.", "captain"}, {"prof.", "professor"}, {"dr.", "doctor"}, {"mt.", "mount"},
     {"st.", "saint"}, {"ft.", "fort"}, {"dept.", "department"}, {"corp.", "corporation"},
     {"atty.", "attorney"}, {"supt.", "superintendent"},
+    {"jan.", "january"}, {"feb.", "february"}, {"mar.", "march"}, {"apr.", "april"},
+    {"aug.", "august"}, {"sep.", "sept.", "september"}, {"oct.", "october"},
+    {"nov.", "november"}, {"dec.", "december"}, {"mon.", "monday"},
+    {"tue.", "tues.", "tuesday"}, {"wed.", "wednesday"}, {"thu.", "thurs.", "thursday"},
+    {"fri.", "friday"}, {"sat.", "saturday"}, {"sun.", "sunday"},
 ]
 ALWAYS_OK = {"i", "feedcast", "ok", "tv", "ai", "ceo", "gdp", "covid"}
 # Words that start sentences and are never names, so a sentence-initial capital on
@@ -130,14 +141,18 @@ def _spelled_numbers(text: str) -> list[NumberMention]:
     run: list[str] = []
 
     def flush():
-        if run and run != ["one"]:
+        # A lone "one" is usually a pronoun, and "first/second/third" usually aren't
+        # figures ("first time"); "fifth", "twenty-eighth" and "one million" are.
+        if run and run != ["one"] and run not in (["first"], ["second"], ["third"]):
             out.append(NumberMention(" ".join(run), _spelled_value(run), 1.0, 0))
         run.clear()
 
     for w in words:
         parts = w.lower().split("-")
-        if all(p in UNITS or p in TENS or p in SCALES for p in parts):
+        if all(p in UNITS or p in TENS or p in SCALES or p in ORDINALS for p in parts):
             run.extend(parts)
+            if parts[-1] in ORDINALS:  # an ordinal ends a number
+                flush()
         elif w.lower() == "and" and run:
             continue
         else:
@@ -149,7 +164,9 @@ def _spelled_numbers(text: str) -> list[NumberMention]:
 def _spelled_value(words: list[str]) -> float:
     total, current = 0.0, 0.0
     for w in words:
-        if w in UNITS:
+        if w in ORDINALS:
+            current += ORDINALS[w]
+        elif w in UNITS:
             current += UNITS[w]
         elif w in TENS:
             current += TENS[w]

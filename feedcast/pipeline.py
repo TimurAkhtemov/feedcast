@@ -256,7 +256,8 @@ def write_notice(svc: Services, kind: str, label: str, title: str, lines: list[s
     body = [f"# {title}", "", *[f"{l}  " for l in lines], ""]
     if report.suggestions:
         body += ["## Feeds worth adding", ""]
-        body += [f"- {s.site}: {s.url} (for “{s.topic}”)" for s in report.suggestions]
+        body += [f"- {s.site}: {s.url or 'no feed found automatically'} (for “{s.topic}”)"
+                 for s in report.suggestions]
         body.append("")
     if report.stats:
         body += ["## Run", "", *[f"- {k.replace('_', ' ')}: {v}" for k, v in report.stats.items()], ""]
@@ -494,14 +495,19 @@ def suggest_feeds(svc: Services, items: list[Item], topic: str, limit: int = 5) 
         if site in seen_sites or site in known_hosts:
             continue
         seen_sites.add(site)
+        found = False
         for candidate in svc.candidate_feeds(it.url)[:8]:
             if normalize_feed_url(candidate) in known_urls:
+                found = True
                 break
             check = svc.check_feed(candidate)
             if check.ok:
                 out.append(FeedSuggestion(site, check.final_url or candidate, check.title, topic))
+                found = True
                 break
-        if len(out) >= limit:
+        if not found:  # still worth knowing: the site covers this topic
+            out.append(FeedSuggestion(site, None, None, topic))
+        if sum(1 for s in out if s.url) >= limit:
             break
     return out
 

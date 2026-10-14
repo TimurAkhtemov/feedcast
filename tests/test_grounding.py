@@ -72,3 +72,11 @@ def test_numbers_in_parses_forms():
     assert ("1,200", 1200) in values
     assert ("5k", 5000) in values
     assert ("twenty one", 21) in values
+
+
+def test_date_abbreviations_and_spelled_ordinals():
+    src = "Homes sold in the Port Elm area, Sept. 28-Oct. 4, for the third time."
+    assert unsupported("Sold from September twenty-eighth to October fourth.", src) == []
+    assert unsupported("It was the first time.", src) == []  # lone ordinals aren't figures
+    assert unsupported("Sold on September twentieth.", src) == ["twentieth"]
+    assert unsupported("Sold on October fifth.", src) == ["fifth"]

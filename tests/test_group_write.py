@@ -102,3 +102,20 @@ def test_cluster_requires_vectors():
     items = _items(store, [("A", "t", "x")])
     assert cluster_items(items, {}, 0.75) == []
     assert len(cluster_items(items, {items[0].id: np.ones(3)}, 0.75)) == 1
+
+
+def test_topic_stories_rank_by_relevance_not_size():
+    from feedcast.pipeline import by_relevance
+
+    store = Store(":memory:")
+    items = _items(store, [
+        ("A", "Bridge reopens", "bridge"), ("B", "Bridge open", "bridge"), ("C", "Bridge news", "bridge"),
+        ("D", "Volcano sensors", "volcano"),
+    ])
+    clusters = cluster_items(items, embed_items(store, KeywordEmbedder(), items), 0.75)
+    assert clusters[0].size == 3  # by size, the bridge wins
+    by_title = {it.title: it.id for it in items}
+    relevance = {by_title["Bridge reopens"]: 0.6, by_title["Volcano sensors"]: 1.7}
+    ranked = by_relevance(clusters, relevance)
+    assert ranked[0].title == "Volcano sensors"
+    assert len(ranked) == 2

@@ -17,6 +17,8 @@ from feedcast.speak import spoken
     ("A £10 ticket.", "A ten pounds ticket."),
     ("Read https://example.com/x now.", "Read now."),
     ("Apples & oranges, e.g. fruit.", "Apples and oranges, for example fruit."),
+    ("Sold Sept. 28 to Oct. 4.", "Sold September twenty-eighth to October fourth."),
+    ("On March 3, 2026, it rained.", "On March third, twenty twenty-six, it rained."),
 ])
 def test_spoken(written, expected):
     assert spoken(written) == expected

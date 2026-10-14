@@ -16,6 +16,9 @@ from feedcast.text import strip_urls
 CURRENCY = {"$": ("dollar", "dollars"), "£": ("pound", "pounds"), "€": ("euro", "euros")}
 SCALE_WORDS = {"k": "thousand", "m": "million", "mn": "million", "bn": "billion",
                "b": "billion", "tn": "trillion", "t": "trillion"}
+MONTHS = {"jan": "January", "feb": "February", "mar": "March", "apr": "April", "aug": "August",
+          "sep": "September", "sept": "September", "oct": "October", "nov": "November",
+          "dec": "December"}
 ABBREVIATIONS = {
     r"\be\.g\.": "for example",
     r"\bi\.e\.": "that is",
@@ -61,6 +64,8 @@ def spoken(text: str) -> str:
     text = strip_urls(text)
     for pattern, replacement in ABBREVIATIONS.items():
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(Jan|Feb|Mar|Apr|Aug|Sept?|Oct|Nov|Dec)\.(?=\s*\d)",
+                  lambda m: MONTHS[m.group(1).lower()], text)
     text = re.sub(
         r"([$£€])\s?(\d[\d,]*(?:\.\d+)?)(?:\s?(thousand|million|billion|trillion)\b|(?:(bn|mn|tn|m|k|b|t)\b))?",
         lambda m: _currency(_merge_scale(m)),
@@ -68,6 +73,12 @@ def spoken(text: str) -> str:
         flags=re.IGNORECASE,
     )
     text = re.sub(r"(\d[\d,]*(?:\.\d+)?)\s?%", r"\1 percent", text)
+    text = re.sub(  # "October 4" is read "October fourth"
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r" (\d{1,2})\b(?![,.]?\d)",
+        lambda m: f"{m.group(1)} {_clean(num2words(int(m.group(2)), to='ordinal'))}",
+        text,
+    )
     text = re.sub(r"(?<![\w.])(\d{1,2}):(\d{2})(?!\d)", _time, text)
     text = re.sub(r"\b(\d+)(st|nd|rd|th)\b",
                   lambda m: _clean(num2words(int(m.group(1)), to="ordinal")), text)

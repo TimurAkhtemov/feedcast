@@ -11,7 +11,7 @@ from feedcast.write import Dropped, Segment
 @dataclass
 class FeedSuggestion:
     site: str
-    url: str
+    url: str | None   # None: the site covered the topic but no working feed was found
     title: str | None
     topic: str
 
@@ -74,9 +74,14 @@ def show_notes(report: RunReport, segments: list[Segment], chapters: list[Chapte
                   "Found through web search for topics the pool covered thinly. Nothing was "
                   "added automatically; to add one, put it in feeds.yaml and run "
                   "`feedcast feeds verify`.", ""]
-        for s in report.suggestions:
+        for s in (s for s in report.suggestions if s.url):
             title = f" ({_md(s.title)})" if s.title else ""
             lines.append(f"- {s.site}{title}: {s.url} (for “{s.topic}”)")
+        no_feed = [s for s in report.suggestions if not s.url]
+        if no_feed:
+            lines += ["", "Sites with matching coverage but no feed found automatically "
+                      "(check the site for one):", ""]
+            lines += [f"- {s.site} (for “{s.topic}”)" for s in no_feed]
         lines.append("")
 
     if report.stats:
