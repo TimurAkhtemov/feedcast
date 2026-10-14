@@ -268,3 +268,7 @@ FEEDCAST_LIVE_SEARXNG=1 uv run pytest tests/test_search_live.py
 with Laya, Ollama, Kokoro, and the web stubbed. Ingest, extraction, clustering, the
 grounding check, ffmpeg, chapters, notes, failure notices, and the phone-request
 watcher are all real.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

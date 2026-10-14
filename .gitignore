@@ -8,3 +8,4 @@ data/
 *.wav
 searxng/.env
 !feedcast/assets/failed.mp3
+CLAUDE.md
